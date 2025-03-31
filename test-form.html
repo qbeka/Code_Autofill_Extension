@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Code Filler Test Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .test-section {
+      margin-bottom: 30px;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    h1 {
+      color: #333;
+    }
+    h2 {
+      color: #555;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    .digit-group {
+      display: flex;
+      gap: 8px;
+    }
+    .digit-group input {
+      width: 40px;
+      text-align: center;
+    }
+    button {
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #3367d6;
+    }
+  </style>
+</head>
+<body>
+  <h1>Auto Code Filler Test Page</h1>
+  <p>This page contains various types of input fields to test the auto code filler extension.</p>
+  
+  <div class="test-section">
+    <h2>Standard Verification Code Input</h2>
+    <div class="form-group">
+      <label for="verificationCode">Enter Verification Code:</label>
+      <input type="text" id="verificationCode" name="verificationCode" placeholder="Enter 6-digit code">
+    </div>
+    <button type="button">Submit</button>
+  </div>
+
+  <div class="test-section">
+    <h2>OTP Input</h2>
+    <div class="form-group">
+      <label for="otpCode">Enter One-Time Password:</label>
+      <input type="text" id="otpCode" name="otpCode" placeholder="Enter OTP">
+    </div>
+    <button type="button">Verify</button>
+  </div>
+
+  <div class="test-section">
+    <h2>Generic Text Input (not specifically for codes)</h2>
+    <div class="form-group">
+      <label for="genericInput">Generic Input:</label>
+      <input type="text" id="genericInput" name="genericInput" placeholder="Enter text here">
+    </div>
+    <button type="button">Submit</button>
+  </div>
+
+  <div class="test-section">
+    <h2>Character-by-Character OTP Input</h2>
+    <div class="form-group">
+      <label>Enter Code (one digit per field):</label>
+      <div class="digit-group">
+        <input type="text" maxlength="1" class="otp-input">
+        <input type="text" maxlength="1" class="otp-input">
+        <input type="text" maxlength="1" class="otp-input">
+        <input type="text" maxlength="1" class="otp-input">
+        <input type="text" maxlength="1" class="otp-input">
+        <input type="text" maxlength="1" class="otp-input">
+      </div>
+    </div>
+    <button type="button">Verify</button>
+  </div>
+
+  <div class="test-section">
+    <h2>Autocomplete One-Time-Code</h2>
+    <div class="form-group">
+      <label for="otcInput">SMS Verification:</label>
+      <input type="text" id="otcInput" name="otcInput" autocomplete="one-time-code" placeholder="Enter code from SMS">
+    </div>
+    <button type="button">Confirm</button>
+  </div>
+
+  <div class="test-section">
+    <h2>Hidden Code Input (should be skipped)</h2>
+    <div class="form-group" style="display: none;">
+      <label for="hiddenCode">Hidden Code Input:</label>
+      <input type="text" id="hiddenCode" name="hiddenCode" placeholder="This is hidden">
+    </div>
+    <p>This section contains a hidden input that should be skipped by the extension.</p>
+  </div>
+
+  <script>
+    // Simple JS to make the character-by-character input work smoothly
+    document.querySelectorAll('.digit-group input').forEach((input, index, inputs) => {
+      input.addEventListener('input', function() {
+        // Auto-advance to next input when a digit is entered
+        if (this.value.length === 1 && index < inputs.length - 1) {
+          inputs[index + 1].focus();
+        }
+      });
+      
+      input.addEventListener('keydown', function(e) {
+        // Handle backspace to go to previous input
+        if (e.key === 'Backspace' && this.value.length === 0 && index > 0) {
+          inputs[index - 1].focus();
+        }
+      });
+    });
+  </script>
+</body>
+</html> 

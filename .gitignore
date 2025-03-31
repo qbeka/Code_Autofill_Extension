@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Node modules (if used)
+node_modules/
+
+# Build output / distribution folders
+dist/
+build/
+
+# Log files
+*.log
+
+# Temporary files and folders
+tmp/
+temp/
+
+# Editor / IDE settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Other hidden files
+*.swp
+
+# Chrome extension files
+*.crx
+*.pem
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+
+manifest.json
+
