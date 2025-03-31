@@ -13,28 +13,6 @@ A Chrome extension that automatically reads verification codes from your Gmail i
 
 ---
 
-## 🛠 Installation (Development)
-
-1. Clone or download this repo.
-2. Open Chrome and go to `chrome://extensions`.
-3. Enable **Developer mode** (top right).
-4. Click **Load unpacked** and select the project folder.
-5. The extension will appear in your browser toolbar.
-
----
-
-## 🔑 OAuth Setup (if building yourself)
-
-1. Go to [Google Cloud Console](https://console.developers.google.com/).
-2. Create a new project and enable the Gmail API.
-3. Set up OAuth credentials:
-   - Type: Web Application
-   - Add redirect URI: `https://<YOUR_EXTENSION_ID>.chromiumapp.org/`
-4. Add your Gmail address as a test user in the OAuth consent screen.
-5. Replace the `client_id` in `manifest.json` with your own.
-
----
-
 ## 🔒 Security & Privacy
 
 - Gmail is accessed via OAuth using the `gmail.readonly` scope.
