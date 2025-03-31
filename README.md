@@ -3,7 +3,7 @@ A Chrome extension that automatically reads verification codes from your Gmail i
 
 ---
 
-## 🔧 Features
+## Features
 
 - Automatically extracts 6-digit codes from recent Gmail messages  
 - Autofills code fields on any active tab  
@@ -13,7 +13,7 @@ A Chrome extension that automatically reads verification codes from your Gmail i
 
 ---
 
-## 🔒 Security & Privacy
+## Security & Privacy
 
 - Gmail is accessed via OAuth using the `gmail.readonly` scope.
 - The extension never stores, sends, or logs your emails or codes.
@@ -24,7 +24,7 @@ This extension is **not** a data collection tool. It simply automates a common t
 
 ---
 
-## 🧪 Testing
+## Testing
 
 Open the included `test-form.html` file in a browser tab and send a test email to your Gmail with a message like:
 
@@ -34,7 +34,7 @@ The extension should detect the email and autofill the test form after a short d
 
 ---
 
-## 📥 Download from Chrome Web Store
+## Download from Chrome Web Store
 
 To install the stable release directly from the Chrome Web Store:  
 👉 [**Download Auto Code Filler**](https://chrome.google.com/webstore/detail/auto-code-filler/your-extension-id-here)
@@ -43,14 +43,14 @@ To install the stable release directly from the Chrome Web Store:
 
 ---
 
-## 📄 License
+## License
 
 **All rights reserved.**  
 You may not copy, distribute, modify, or reuse this code without written permission from the author.
 
 ---
 
-## 📬 Contact
+## Contact
 
 Built by Qendrim Beka  
 [LinkedIn](https://www.linkedin.com/in/qendrimbeka)
