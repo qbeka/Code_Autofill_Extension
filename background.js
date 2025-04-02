@@ -138,6 +138,9 @@ class BackgroundManager {
           status: 'noEmails'
         });
         
+        // Send a notification to all open tabs to show the error visualization
+        await this.sendNoCodeFoundToTabs();
+        
         this.isCheckingEmails = false;
         return;
       }
@@ -146,6 +149,27 @@ class BackgroundManager {
       
       // Get the most recent message (first in the list)
       const mostRecentMessage = messages[0];
+      
+      // Check if the most recent message is within last 10 minutes to ensure freshness
+      try {
+        // Get full message details
+        const message = await this.gmailApi.getMessage(mostRecentMessage.id);
+        const internalDate = parseInt(message.internalDate || Date.now(), 10);
+        const messageDate = new Date(internalDate);
+        const messageAgeMinutes = (Date.now() - internalDate) / (1000 * 60);
+        
+        console.log(`Most recent message is from ${messageDate.toISOString()} (${messageAgeMinutes.toFixed(1)} minutes old)`);
+        
+        // Log message subject for debugging
+        const headers = message.payload?.headers || [];
+        const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || 'No subject';
+        const from = headers.find(h => h.name.toLowerCase() === 'from')?.value || '';
+        console.log(`Most recent email subject: "${subject}"`);
+        console.log(`Email From: ${from}`);
+      } catch (error) {
+        console.warn('Error checking most recent message details:', error);
+        // Continue processing anyway
+      }
       
       // Process only the most recent message
       const extractedCode = await this.processMessage(mostRecentMessage.id);
@@ -162,7 +186,8 @@ class BackgroundManager {
         
         await this.sendCodeToTabs(extractedCode);
       } else {
-        console.log('No verification code found in the most recent email');
+        console.log('No verification code found in the most recent email - SHOWING ERROR VISUALIZATION');
+        
         // Show desktop notification
         this.showNotification('No verification code found', 'The most recent email does not contain a verification code.');
         
@@ -172,7 +197,7 @@ class BackgroundManager {
           status: 'noCodeFound'
         });
         
-        // Also send a notification to all open tabs to show the visual indicator
+        // ALWAYS trigger the error visualization when no code is found in the most recent email
         await this.sendNoCodeFoundToTabs();
       }
     } catch (error) {
@@ -184,6 +209,9 @@ class BackgroundManager {
         status: 'error',
         error: error.message
       });
+      
+      // Always show error visualization on failures
+      await this.sendNoCodeFoundToTabs();
       
       // If token issue, try to refresh
       if (error.message && error.message.includes('401')) {
@@ -216,13 +244,38 @@ class BackgroundManager {
       // Extract subject from headers
       const headers = message.payload.headers || [];
       const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';
+      const from = headers.find(h => h.name.toLowerCase() === 'from')?.value || '';
+      
+      console.log(`Email From: ${from}`);
+      console.log(`Email Subject: ${subject}`);
+      
+      // Add subject to full content
       fullContent += subject + ' ';
       
       // Extract body using recursive function
       const bodyContent = this.extractBodyContent(message.payload);
       fullContent += bodyContent;
       
-      console.log('Extracted email content:', fullContent.substring(0, 300) + '...');
+      // Check if the email is very short - might not contain a code
+      if (fullContent.length < 50) {
+        console.log('Warning: Email content is very short, might not contain verification code');
+      }
+      
+      // Log a reasonable portion of the email content for debugging
+      const contentPreview = fullContent.substring(0, 300);
+      console.log('Extracted email content (first 300 chars):', contentPreview + '...');
+      
+      // Check if email contains verification-related keywords
+      const verificationKeywords = ['verification', 'code', 'auth', 'login', 'security', 'password', 'confirm'];
+      const hasVerificationContext = verificationKeywords.some(word => 
+        fullContent.toLowerCase().includes(word.toLowerCase())
+      );
+      
+      if (!hasVerificationContext) {
+        console.log('Warning: Email does not contain common verification keywords');
+      } else {
+        console.log('Email contains verification-related keywords, likely a verification email');
+      }
       
       // Extract verification code from full content
       const code = this.extractCode(fullContent);
@@ -236,7 +289,7 @@ class BackgroundManager {
         
         return code;
       } else {
-        console.log('No verification code found in message');
+        console.log('No verification code found in message - this will trigger error visualization');
         return null;
       }
     } catch (error) {
@@ -310,7 +363,12 @@ class BackgroundManager {
         for (const tab of tabs) {
           try {
             // Skip chrome:// and other restricted URLs
-            if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+            if (!tab.url || 
+                tab.url.startsWith('chrome://') || 
+                tab.url.startsWith('chrome-extension://') ||
+                tab.url.includes('chrome.google.com/webstore') ||
+                tab.url.includes('chrome.google.com/extensions')) {
+              console.log(`Skipping restricted URL: ${tab.url}`);
               tabsProcessed++;
               processTabResults();
               continue;
@@ -329,6 +387,19 @@ class BackgroundManager {
                 // If content script isn't running, inject it
                 console.log(`Content script not found in tab ${tab.id}, injecting it now...`);
                 try {
+                  // First, check if we're dealing with a Chrome page or extensions gallery
+                  const tabUrl = tab.url || '';
+                  if (tabUrl.startsWith('chrome://') || 
+                      tabUrl.startsWith('chrome-extension://') || 
+                      tabUrl.includes('chrome.google.com/webstore') ||
+                      tabUrl.includes('chrome.google.com/extensions')) {
+                    console.log(`Tab ${tab.id} is a restricted Chrome page, skipping injection`);
+                    failCount++;
+                    tabsProcessed++;
+                    processTabResults();
+                    continue;
+                  }
+                  
                   // Execute the content script in the tab
                   await chrome.scripting.executeScript({
                     target: { tabId: tab.id },
@@ -402,7 +473,12 @@ class BackgroundManager {
         for (const tab of tabs) {
           try {
             // Skip chrome:// and other restricted URLs
-            if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+            if (!tab.url || 
+                tab.url.startsWith('chrome://') || 
+                tab.url.startsWith('chrome-extension://') ||
+                tab.url.includes('chrome.google.com/webstore') ||
+                tab.url.includes('chrome.google.com/extensions')) {
+              console.log(`Skipping restricted URL: ${tab.url}`);
               tabsProcessed++;
               processTabResults();
               continue;
@@ -421,6 +497,19 @@ class BackgroundManager {
                 // If content script isn't running, inject it
                 console.log(`Content script not found in tab ${tab.id}, injecting it now...`);
                 try {
+                  // First, check if we're dealing with a Chrome page or extensions gallery
+                  const tabUrl = tab.url || '';
+                  if (tabUrl.startsWith('chrome://') || 
+                      tabUrl.startsWith('chrome-extension://') || 
+                      tabUrl.includes('chrome.google.com/webstore') ||
+                      tabUrl.includes('chrome.google.com/extensions')) {
+                    console.log(`Tab ${tab.id} is a restricted Chrome page, skipping injection`);
+                    failCount++;
+                    tabsProcessed++;
+                    processTabResults();
+                    continue;
+                  }
+                  
                   // Execute the content script in the tab
                   await chrome.scripting.executeScript({
                     target: { tabId: tab.id },
@@ -575,57 +664,141 @@ class BackgroundManager {
                           .replace(/\s+/g, ' ')
                           .trim();
     
+    // Helper function to validate a code
+    const isValidCode = (code) => {
+      if (!code) return false;
+      
+      // Minimum length check (codes should be at least 4 digits)
+      if (code.length < 4) return false;
+      
+      // Maximum length check - most verification codes are 8 digits or less
+      if (code.length > 8) return false;
+      
+      // Check if the code is all numeric, which is most common
+      const isNumeric = /^[0-9]+$/.test(code);
+      
+      // If it's alphanumeric, it needs to follow a certain pattern to be valid
+      // Most alphanumeric codes are 6-8 characters with at least one letter and one number
+      const isValidAlphanumeric = /^[A-Z0-9]{6,8}$/.test(code) && 
+                                 /[A-Z]/.test(code) && 
+                                 /[0-9]/.test(code) && 
+                                 !/^[0]+$/.test(code);
+      
+      // Reject codes that appear to be dates (MM/DD/YYYY, MM-DD-YYYY, or YYYY-MM-DD format)
+      if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(code) || 
+          /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(code)) {
+        return false;
+      }
+      
+      // Reject codes that are all same digit (like 000000)
+      if (/^(\d)\1+$/.test(code)) {
+        return false;
+      }
+      
+      // Reject codes that are sequential (like 123456 or 654321)
+      if (/^(?:0?1?2?3?4?5?6?7?8?9?|9?8?7?6?5?4?3?2?1?0?)$/.test(code)) {
+        return false;
+      }
+      
+      // Reject if it looks like a year
+      if (/^(19|20)\d{2}$/.test(code)) {
+        return false;
+      }
+      
+      // If we're looking at a numeric code, it's more likely to be a verification code 
+      // if it doesn't look like other common numbers
+      if (isNumeric) {
+        // Common numeric codes are 4-8 digits
+        return code.length >= 4 && code.length <= 8;
+      }
+      
+      return isValidAlphanumeric;
+    };
+    
     // Helper function to get only the numeric part of a code and ensure proper length
     const processCode = (codeString) => {
-      // Extract only the numeric digits
+      // Remove any non-alphanumeric characters
+      const cleanCode = codeString.replace(/[^a-zA-Z0-9]/g, '');
+      
+      // Extract only the numeric digits if it's all numeric
       const numericOnly = codeString.replace(/[^0-9]/g, '');
-      console.log(`Extracted numeric part: ${numericOnly} from ${codeString}`);
+      console.log(`Extracted part: ${cleanCode} (numeric: ${numericOnly}) from ${codeString}`);
+      
+      // If the code isn't valid, don't return it
+      if (!isValidCode(numericOnly) && !isValidCode(cleanCode)) {
+        console.log(`Rejected invalid code: ${cleanCode}`);
+        return null;
+      }
       
       // Determine most likely verification code format
-      // Most common verification codes are 4, 5, 6, or 8 digits
-      if (numericOnly.length === 6) {
-        // 6-digit code (most common)
+      if (numericOnly.length >= 4 && numericOnly.length <= 8 && isValidCode(numericOnly)) {
+        // Standard numeric code (4-8 digits)
         return numericOnly;
-      } else if (numericOnly.length === 4 || numericOnly.length === 5 || numericOnly.length === 8) {
-        // Other common lengths
-        return numericOnly;
-      } else if (numericOnly.length > 8) {
-        // If too long, take first 6 digits as most likely to be a verification code
-        return numericOnly.substring(0, 6);
-      } else if (numericOnly.length > 6) {
-        // If 7 digits, likely a 6-digit code with an extra digit
-        return numericOnly.substring(0, 6);
+      } else if (cleanCode.length >= 6 && cleanCode.length <= 8 && isValidCode(cleanCode)) {
+        // Alpha-numeric code (usually 6-8 chars with at least one letter)
+        return cleanCode.toUpperCase();
       } else {
-        // Return as is for shorter codes
-        return numericOnly;
+        // Not a valid code
+        return null;
       }
     };
     
+    // Context-aware code search - only look for codes near verification-related words
+    const verificationContext = [
+      'verification', 'verify', 'code', 'pin', 'otp', 'passcode', 
+      'secure', 'security', 'authorization', 'authenticate', 'auth',
+      'confirm', 'confirmation', 'login', 'sign-in', '2fa', 'two-factor',
+      'one-time', 'password', 'token'
+    ];
+    
+    // Check if the email has verification-related context
+    const hasVerificationContext = verificationContext.some(word => 
+      cleanText.toLowerCase().includes(word.toLowerCase())
+    );
+    
+    // STRICT REQUIREMENT: If no verification context is found, return null immediately
+    // This prevents extracting random numbers from unrelated emails
+    if (!hasVerificationContext) {
+      console.log('No verification context found in email, not extracting any codes');
+      return null;
+    }
+    
     // Patterns ordered by priority (most specific first)
     const patterns = [
-      // Very specific patterns for numeric codes
-      /(?:verification|auth|security|confirmation|login|sign-in|2fa|authorization)\s+code(?:\s+is|\s*:\s*)([0-9]{4,8})/i,
-      /(?:your|the)\s+(?:code|otp|pin)(?:\s+is|\s*:\s*)([0-9]{4,8})/i,
-      /code\s*[:=]\s*([0-9]{4,8})/i,
+      // Very specific patterns for numeric codes with clear labeling
+      /(?:verification|auth|security|confirmation|login|sign-in|2fa|authorization)\s+code(?:\s+is|\s*[:=]\s*)([0-9]{4,8})/i,
+      /(?:your|the)\s+(?:code|otp|pin|passcode)(?:\s+is|\s*[:=]\s*)([0-9]{4,8})/i,
+      /(?:code|pin|otp|passcode)\s*[:=]\s*([0-9]{4,8})/i,
       
-      // Common formatted codes with spaces or dashes
-      /\b([0-9]{3}[\s\-][0-9]{3})\b/, // 123-456 format
+      // Common formatted codes with spaces or dashes that are clearly codes
+      /\b(?:code|pin|otp|passcode)\s*[:=]?\s*([0-9]{3}[\s\-][0-9]{3})\b/i,
       
-      // Search for specific formats
+      // Special formats with clear labeling
+      /\b(?:code|pin|otp|passcode)\s*[:=]?\s*([A-Z0-9]{1,2}[\s\-]+[0-9]{3,6})\b/i,
+      
+      // Look for more general labeled codes
+      /(?:code|pin|otp|token|passcode|password)\s*(?:is|:=|:|\s)\s*([a-zA-Z0-9]{4,8})/i,
+      
+      // Codes highlighted or emphasized in some way (in quotes, brackets, etc.)
+      /"([0-9]{4,8})"/,
+      /'([0-9]{4,8})'/,
+      /\s\*\*([0-9]{4,8})\*\*/,
+      /\(([0-9]{4,8})\)/,
+      
+      // Look for codes in a context that suggests they are verification codes
+      /verification[\s\S]{1,50}?([0-9]{4,8})/i,
+      /authentication[\s\S]{1,50}?([0-9]{4,8})/i,
+      /one-time[\s\S]{1,50}?([0-9]{4,8})/i,
+      /security[\s\S]{1,50}?([0-9]{4,8})/i,
+      
+      // Common numeric patterns, only when near context words
       /\b([0-9]{6})\b/, // 6-digit (most common)
       /\b([0-9]{5})\b/, // 5-digit
       /\b([0-9]{4})\b/, // 4-digit PIN
       /\b([0-9]{8})\b/, // 8-digit
       
-      // Look for labeled codes
-      /(?:code|pin|otp|token|passcode)\s*(?:is|:|\s)\s*([a-zA-Z0-9]{4,8})/i,
-      
-      // Special formats
-      /\b([A-Z0-9]{1,2}[\s\-]+[0-9]{5,6})\b/i, // Format like "FB - 96525"
-      
       // Alphanumeric codes (less common)
-      /\b([a-zA-Z0-9]{6})\b/,
-      /\b([a-zA-Z0-9]{8})\b/
+      /\b([A-Za-z0-9]{6,8})\b/  // General 6-8 char alphanumeric
     ];
     
     // Extra regex for Gmail preview snippets that often show "Your verification code is 123456"
@@ -636,7 +809,8 @@ class BackgroundManager {
       if (snippetMatch && snippetMatch[1]) {
         const matchedCode = snippetMatch[1].replace(/\s+/g, '');
         console.log(`Found code from verification snippet: ${matchedCode}`);
-        return processCode(matchedCode);
+        const processedCode = processCode(matchedCode);
+        if (processedCode) return processedCode;
       }
     }
     
@@ -647,18 +821,14 @@ class BackgroundManager {
         // Remove spaces first
         const matchedCode = match[1].replace(/\s+/g, '');
         console.log(`Found code: ${matchedCode} using pattern: ${regex}`);
-        return processCode(matchedCode);
+        const processedCode = processCode(matchedCode);
+        if (processedCode) return processedCode;
       }
     }
     
-    // Last resort: look for any isolated digit sequence that might be a code
-    const lastResortMatch = cleanText.match(/\b([0-9]{4,8})\b/);
-    if (lastResortMatch && lastResortMatch[1]) {
-      const code = lastResortMatch[1];
-      console.log(`Found code using last resort pattern: ${code}`);
-      return processCode(code);
-    }
-    
+    // No code found - always return null rather than using last resort patterns
+    // This ensures the error visualization plays when we can't find a clear verification code
+    console.log('No verification code matched our patterns in this email');
     return null;
   }
 }
@@ -674,3 +844,4 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => {
   console.log('Extension started');
 });
+

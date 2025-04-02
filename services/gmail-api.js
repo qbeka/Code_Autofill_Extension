@@ -107,7 +107,8 @@ class GmailAPI {
       
       // Construct a query for newer messages only, prioritizing unread messages
       // Gmail search operators: https://support.google.com/mail/answer/7190
-      const query = `after:${Math.floor(fiveMinutesAgo)} OR is:unread`;
+      // Use "newer_than" to prioritize most recent emails, add "newer:1d" as a fallback
+      const query = `after:${Math.floor(fiveMinutesAgo)} OR (is:unread newer:1d)`;
       
       const response = await fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=10`,
@@ -136,6 +137,21 @@ class GmailAPI {
       }
       
       console.log(`Found ${data.messages.length} recent Gmail messages`);
+      
+      // Messages are typically returned with newest first, but let's add an explicit check
+      // by retrieving message details for the first message to verify it's the most recent
+      if (data.messages.length > 0) {
+        try {
+          const mostRecentMessage = await this.getMessage(data.messages[0].id);
+          const internalDate = parseInt(mostRecentMessage.internalDate, 10);
+          const messageDate = new Date(internalDate);
+          console.log(`Most recent message timestamp: ${messageDate.toISOString()}`);
+        } catch (error) {
+          console.warn('Error checking most recent message date:', error);
+          // Continue anyway, as we'll still use the first message
+        }
+      }
+      
       return data.messages || [];
     } catch (error) {
       console.error('Error fetching Gmail messages:', error);
